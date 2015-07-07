@@ -25,11 +25,17 @@ naes_phone_matrix_list <- create_phone_data_from_database(naes_phone_data_matrix
 
 lapply(1:10, function(i) summarize_inc_distr(naes_phone_matrix_list[[i]]))
 
-save.image(file = "naes_data_processed.R")
+combine_data_sets = F
 
-naes_phone_missing_matrix[, c("age", "inc", "edu")] <- naes_phone_imputations$inc
+#Run if you want to combine data sets
+if (combine_data_sets)
+{
+  naes_data_matrix_list <- lapply(naes_phone_matrix_list, function(naes_phone_matrix) {rbind(naes_online_data_matrix[, key_col_names], naes_phone_matrix[, key_col_names])})
+} else {
+  naes_data_matrix_list <- lapply(naes_phone_matrix_list, function(naes_phone_matrix) {return(naes_phone_matrix[, key_col_names])})
+  naes_data_matrix_list[[(length(naes_data_matrix_list) + 1)]] <- naes_online_data_matrix[, key_col_names]
+}
 
-naes_data_matrix_list <- lapply(naes_phone_matrix_list, function(naes_phone_matrix) {rbind(naes_online_data_matrix[, key_col_names], naes_phone_matrix[, key_col_names])})
 naes_data_matrix_list <- lapply(naes_data_matrix_list, function(naes_data_matrix) {transform(naes_data_matrix, age = (as.integer(age)),
                                                                                                                stt = (as.integer(stt)),
                                                                                                                eth = (as.integer(eth)),
@@ -39,6 +45,8 @@ naes_data_matrix_list <- lapply(naes_data_matrix_list, function(naes_data_matrix
                                                                                    naes_data_matrix$"grp" <- apply(naes_data_matrix[, c("stt", "eth", "inc", "age")], 1, paste, collapse="_");
                                                                                    naes_data_matrix$"reg" <- translate_state_to_reg(naes_data_matrix$"stt");
                                                                                    return(naes_data_matrix)})
+
+save.image(file = "naes_data_processed.R")
 
 predictor_matrix <- as.data.frame(expand.grid(1:n.stt, 1:n.eth, 1:n.inc, 1:n.age))
 colnames(predictor_matrix) <- c("stt", "eth", "inc", "age")
