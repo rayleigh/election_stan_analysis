@@ -1,7 +1,8 @@
-#Got data from http://www.annenbergpublicpolicycenter.org/naes-data-sets/
-
+mode#Got data from http://www.annenbergpublicpolicycenter.org/naes-data-sets/
 library(dplyr)
 library(mi)
+
+remove(list=objects())
 
 naes_helper_function_filepath = "~/Documents/Gelman Research/Replication/Subsequent Research/naes_helper_functions.R"
 source(naes_helper_function_filepath)
@@ -46,15 +47,6 @@ naes_data_matrix_list <- lapply(naes_data_matrix_list, function(naes_data_matrix
                                                                                    naes_data_matrix$"reg" <- translate_state_to_reg(naes_data_matrix$"stt");
                                                                                    return(naes_data_matrix)})
 
-save.image(file = "naes_data_processed.R")
+save.image(file = "naes_data_processed.Rdata")
 
-predictor_matrix <- as.data.frame(expand.grid(1:n.stt, 1:n.eth, 1:n.inc, 1:n.age))
-colnames(predictor_matrix) <- c("stt", "eth", "inc", "age")
-predictor_matrix$age <- factor(predictor_matrix$age)
-predictor_matrix$eth <- factor(predictor_matrix$eth)
-predictor_matrix$inc <- factor(predictor_matrix$inc)
-predictor_matrix$stt <- factor(predictor_matrix$stt)
-
-predictor_matrix$grp <- apply(predictor_matrix, 1, paste, collapse="_")
-predictor_matrix$ix <- 1:nrow(predictor_matrix)
-
+  

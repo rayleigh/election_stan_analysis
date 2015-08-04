@@ -68,7 +68,7 @@ create_phone_data_from_database <- function(naes_phone_data_matrix)
   naes_phone_missing_matrix <- change(naes_phone_missing_matrix, y = c("edu", "emp"), what = "type", to = c("ordered-categorical", "ordered-categorical"))
 
   #Run imputation 10 times, grab last chain of 10
-  naes_imputed_data <- lapply(1:10, function(i) impute_and_grab_data(naes_phone_missing_matrix))
+  naes_imputed_data <- lapply(1:10, function(i) {print(i); impute_and_grab_data(naes_phone_missing_matrix)})
   naes_phone_interested_matrix_list <- lapply(naes_imputed_data, function(naes_imputed_data_matrix) {naes_phone_interested_matrix$inc <- naes_imputed_data_matrix$inc; return(naes_phone_interested_matrix)})
   
   return(naes_phone_interested_matrix_list)
