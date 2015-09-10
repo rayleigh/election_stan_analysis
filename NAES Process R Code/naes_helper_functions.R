@@ -41,7 +41,8 @@ create_phone_data_from_database <- function(naes_phone_data_matrix)
   phone_voting_pref_questions <- sapply(phone_voting_pref_questions, function(question) {paste(question, "c", sep = "_")}, simplify = T, USE.NAMES = F)
   core_identity_questions <- c("WA02", "WA04", "WA05", "WC01", "WC03", "WFc01")
   core_identity_questions <- sapply(core_identity_questions, function(question) {paste(question, "c", sep = "_")}, simplify = T, USE.NAMES = F)
-  phone_interested_cols <- c(core_identity_questions, "WA03", "WB01", phone_voting_pref_questions)
+  inc_impute_variables <- c("WA03", "WB01", "WA01")
+  phone_interested_cols <- c(core_identity_questions, inc_impute_variables, phone_voting_pref_questions)
   
   naes_phone_interested_matrix <- get_data_matrix_with_only_interested_cols(phone_interested_cols, naes_phone_data_matrix)
   naes_phone_interested_matrix <- get_data_matrix_without_missing_vals_cols(core_identity_questions, naes_phone_interested_matrix)
@@ -57,15 +58,16 @@ create_phone_data_from_database <- function(naes_phone_data_matrix)
   naes_phone_interested_matrix$weight <- 1
   naes_phone_interested_matrix <- rename(naes_phone_interested_matrix, 
                                          edu = WA03_c,
-                                         emp = WB01_c)
+                                         emp = WB01_c,
+                                         sex = WA01_c)
   naes_phone_interested_matrix <- naes_phone_interested_matrix[!is.na(rownames(naes_phone_interested_matrix)),]
   
-  tmp_phone_missing_data_matrix <- naes_phone_interested_matrix[, c("age", "inc", "edu", "emp")]
+  tmp_phone_missing_data_matrix <- naes_phone_interested_matrix[, c("age", "inc", "edu", "emp", "eth", "sex")]
   tmp_phone_missing_data_matrix$edu[tmp_phone_missing_data_matrix$edu > 997] <- NA
   tmp_phone_missing_data_matrix$emp[tmp_phone_missing_data_matrix$emp > 997] <- NA
   
   naes_phone_missing_matrix <- missing_data.frame(tmp_phone_missing_data_matrix)
-  naes_phone_missing_matrix <- change(naes_phone_missing_matrix, y = c("edu", "emp"), what = "type", to = c("ordered-categorical", "ordered-categorical"))
+  naes_phone_missing_matrix <- change(naes_phone_missing_matrix, y = c("edu", "emp", "eth", "sex"), what = "type", to = c("ordered-categorical", "unordered-categorical", "unordered-categorical", "binary"))
 
   #Run imputation 10 times, grab last chain of 10
   naes_imputed_data <- lapply(1:10, function(i) {print(i); impute_and_grab_data(naes_phone_missing_matrix)})
@@ -123,17 +125,22 @@ translate_state_to_reg <- function(survey_state_col)
 
 translate_phone_eth <- function(hispanic_origin_answer, race_answer)
 {
-  #Is Hispanic
-  if (hispanic_origin_answer == 1 | (race_answer == 5))
-  {
-    return(3)
-  }
-  #Is black or white
-  else if (race_answer < 3)
+  #Is black
+  if (race_answer == 2)
   {
     return(race_answer)
   }
-  #Falls under other ace
+  #Is Hispanic
+  else if (hispanic_origin_answer == 1 | (race_answer == 5))
+  {
+    return(3)
+  }
+  #Is white
+  else if (race_answer == 1)
+  {
+    return(race_answer)
+  }
+  #Falls under other race
   else if (race_answer < 998)
   {
     return(4)
@@ -211,8 +218,8 @@ get_data_matrix_without_missing_vals_cols <- function(key_questions, data_matrix
 
 impute_and_grab_data <- function(missing_matrix)
 {
-  missing_imputations <- mi(missing_matrix, n.iter = 50, n.chains = 10)
-  imputated_matrix <- complete(missing_imputations, m = 10)[[10]]
+  missing_imputations <- mi(missing_matrix, n.iter = 60, n.chains = 10)
+  imputated_matrix <- complete(missing_imputations)
 }
 
 summarize_inc_distr <- function(data_matrix)
