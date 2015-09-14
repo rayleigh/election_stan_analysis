@@ -2,10 +2,11 @@ library(arm)
 library(car)
 library(maps)
 library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
 
 remove(list=objects())
-setwd("~/Documents/Gelman Research/Replication/Subsequent Research/")
-source("~/Documents/Gelman Research/Replication/Subsequent Research/R code/stan_lmer_voting_analysis.R")
+source("stan_lmer_voting_analysis.R")
 
 ########################################################################################
 ### labels
@@ -116,9 +117,9 @@ for (i.year in 1:2) {
   tmp$grp <- apply(tmp[, c("stt", "eth", "inc", "age")], 1, paste, collapse="_")
   tmp$ones <- 1
   
-  M.cps[[i.year]] <- stan_vote_regression(data_matrix, tmp, 3, paste("CPS_Turnout_Model",years[i.year],sep="_"))
-  stan_rdump(names(M.cps[[i.year]]$data), file = paste("CPS_Turnout_Model",years[i.year],"data.csv",sep="_"), envir = list2env(M.cps[[i.year]]$data))
-  
+  stan_cps_data <- stan_vote_regression(data_matrix, tmp, 3, paste("CPS_Turnout_Model",years[i.year],sep="_"))
+  M.cps[[i.year]] <- stan(data = stan_cps_data, file = "../Stan/CPS_Turnout_Model_2004_Level_3.stan", iter = 500) 
+
   ### vote choice model
   cat("*****   Annenberg/Pew Vote Choice Model\n")
   tmp <- dat.vot[dat.vot$year==years[i.year],]
@@ -126,15 +127,19 @@ for (i.year in 1:2) {
   tmp$ones <- 1
   tmp <- rename(tmp,vote = rvote)
   
-  M.vot[[i.year]] <- stan_vote_regression(data_matrix, tmp, 3, paste("Pew_Vote_Model",years[i.year],sep="_"))
-  stan_rdump(names(M.vot[[i.year]]$data), file = paste("Pew_Vote_Model",years[i.year],"data.csv",sep="_"), envir = list2env(M.vot[[i.year]]$data))
-  
+  stan_pew_data <- stan_vote_regression(data_matrix, tmp, 3, paste("Pew_Vote_Model",years[i.year],sep="_"))
+  M.vot[[i.year]] <- stan(data = stan_pew_data, file = file = "../Stan/CPS_Turnout_Model_2004_Level_3.stan", iter = 500)
+
   
 }
-data_matrix$turn2004.M <- fitted(M.cps[[1]])
-data_matrix$turn2008.M <- fitted(M.cps[[2]])
-data_matrix$vote2004.M <- fitted(M.vot[[1]])
-data_matrix$vote2008.M <- fitted(M.vot[[2]])
+
+interested_rows <- sapply(1:nrow(data_matrix), function(i) paste("p[", i, "]", sep = ""))
+interested_cols <- c("mean")
+
+data_matrix$turn2004.M <- invlogit(summary(M.cps[[1]])$summary[interested_rows, interested_cols])
+data_matrix$turn2008.M <- invlogit(summary(M.cps[[2]])$summary[interested_rows, interested_cols])
+data_matrix$vote2004.M <- invlogit(summary(M.vot[[1]])$summary[interested_rows, interested_cols])
+data_matrix$vote2008.M <- invlogit(summary(M.vot[[2]])$summary[interested_rows, interested_cols])
 
 ### poststratification
 dat.pop$grp <- apply(dat.pop[, c("stt", "eth", "inc", "age")], 1, paste, collapse="_")
@@ -150,10 +155,129 @@ data_matrix$vote2008 <- data_matrix$vote2004 <- data_matrix$turn2008 <- data_mat
 for (i in 1:n.stt) {
   cat(paste(i, "of", n.stt, "\n"))
   ok <- data_matrix$stt==i
-  data_matrix$turn2004[ok] <- weighted_correction(a=data_matrix$turn2004.M[ok], w=data_matrix$pop2004[ok], x=dat.stt[as.character(i), "vote2004"])$corrected
-  data_matrix$turn2008[ok] <- weighted_correction(a=data_matrix$turn2008.M[ok], w=data_matrix$pop2008[ok], x=dat.stt[as.character(i), "vote2008"])$corrected
-  data_matrix$vote2004[ok] <- weighted_correction(a=data_matrix$vote2004.M[ok], w=data_matrix$pop2004[ok]/sum(data_matrix$pop2004[ok]), x=dat.stt[as.character(i), "rep2004"])$corrected
-  data_matrix$vote2008[ok] <- weighted_correction(a=data_matrix$vote2008.M[ok], w=data_matrix$pop2008[ok]/sum(data_matrix$pop2008[ok]), x=dat.stt[as.character(i), "rep2008"])$corrected
+  data_matrix$turn2004[ok] <- weighted_correction(data_matrix$turn2004.M[ok], data_matrix$pop2004[ok], dat.stt[as.character(i), "vote2004"])$corrected
+  data_matrix$turn2008[ok] <- weighted_correction(data_matrix$turn2008.M[ok], data_matrix$pop2008[ok], dat.stt[as.character(i), "vote2008"])$corrected
+  data_matrix$vote2004[ok] <- weighted_correction(data_matrix$vote2004.M[ok], data_matrix$pop2004[ok]/sum(data_matrix$pop2004[ok]), dat.stt[as.character(i), "rep2004"])$corrected
+  data_matrix$vote2008[ok] <- weighted_correction(data_matrix$vote2008.M[ok], data_matrix$pop2008[ok]/sum(data_matrix$pop2008[ok]), dat.stt[as.character(i), "rep2008"])$corrected
 }
 
-save.image("MRP-20120715.RData")
+save.image("stan-MRP-20120715.RData")
+
+########################################################################################
+### figure 2 -- model checking
+
+load.image("stan-MRP-20120715.RData")
+
+data_matrix$plot.grp <- apply(data_matrix[, c("stt", "inc")], 1, paste, collapse="_")
+D2 <- summarize(group_by(data_matrix, plot.grp), vote2008 = sum(vote2008 * pop2008)/sum(pop2008), vote2004 = sum(vote2004 * pop2004)/sum(pop2004), stt = unique(stt), inc = unique(inc))
+D3 <- summarize(group_by(data_matrix[data_matrix$eth==1,], plot.grp), vote2008 = sum(vote2008 * pop2008)/sum(pop2008), vote2004 = sum(vote2004 * pop2004)/sum(pop2004), stt = unique(stt), inc = unique(inc))
+
+#2008
+stt.inc <- as.data.frame(expand.grid(sort(unique(D2$stt)), sort(unique(D2$inc))))
+colnames(stt.inc) <- c("stt", "inc")
+stt.inc$fit2 <- stt.inc$se2 <- stt.inc$mu2 <- 
+  stt.inc$fit1 <- stt.inc$se1 <- stt.inc$mu1 <- NA
+
+for (i in 1:nrow(stt.inc)) {
+  ok <- which(dat.vot$stt==stt.inc$stt[i] & dat.vot$inc==stt.inc$inc[i] & dat.vot$year==2008)
+  if (length(ok) > 1) {
+    stt.inc$fit1[i] <- D2$vote2008[D2$stt==stt.inc$stt[i] & D2$inc==stt.inc$inc[i]]
+    stt.inc$mu1[i] <- min(0.98, max(0.02, weighted_mean(dat.vot$rvote[ok], w=dat.vot$weight[ok])))
+    stt.inc$se1[i] <- sqrt((stt.inc$fit1[i]*(1-stt.inc$fit1[i])) / length(ok))
+  }
+  ok <- which(dat.vot$stt==stt.inc$stt[i] & dat.vot$inc==stt.inc$inc[i] & dat.vot$year==2008 & dat.vot$eth==1)
+  if (length(ok) > 1) {
+    stt.inc$fit2[i] <- D3$vote2008[D3$stt==stt.inc$stt[i] & D3$inc==stt.inc$inc[i]]
+    stt.inc$mu2[i] <- min(0.98, max(0.02, weighted_mean(dat.vot$rvote[ok], w=dat.vot$weight[ok])))
+    stt.inc$se2[i] <- sqrt((stt.inc$fit2[i]*(1-stt.inc$fit2[i])) / length(ok))
+  }
+}
+
+png ("2008_stan_fig2.png", height=10, width=10, res=300, units="in")
+graph.dims <- c(7,7)
+par(mfrow=graph.dims, mar=c(1,0.75,1,0.75), tck=0, mgp=c(1.5,.5,0), 
+    oma=c(7,2,4,0), lwd=0.5)
+sort.state <- rev(order(dat.stt$rep2008[1:51]))
+state.names <- c(state.name[1:8], "Washington DC", state.name[9:50])
+colors <- c ("gray40", "darkorange")
+pchs <- c (20, 21)
+count <- 0
+for (i in sort.state){
+  if (!(stt.label[i] %in% c("AK","HI","DC"))){
+    count <- count + 1
+    plot(c(1,5), c(0,1), xlab="", ylab="", xaxt="n", yaxt="n", type="n", yaxs="i")
+    if (count%%graph.dims[2]==1)
+      axis(2, c(.02,.5,.95), c("0%","50%","100%"), cex.axis=1.1, lwd=0.5)
+    if (count > (48-graph.dims[2]))
+      axis(1, c(1.2,3,4.8), c("poor","mid","rich"), cex.axis=1.2, lwd=0.5)
+    abline (.5, 0, col="gray", lwd=.5)
+    
+    tmp <- stt.inc[stt.inc$stt==i,]
+    points(1:5 - 0.05, tmp$mu1, pch=20, col=colors[1], cex=0.5)
+    segments(1:5 - 0.05, tmp$mu1 - tmp$se1, 1:5 - 0.05, tmp$mu1 + tmp$se1, col=colors[1])
+    points(1:5, tmp$fit1, type="l", col=colors[1])
+    
+    points(1:5 + 0.05, tmp$mu2, ylim=c(0,1), pch=20, col=colors[2], cex=0.5)
+    segments(1:5 + 0.05, tmp$mu2 - tmp$se2, 1:5 + 0.05, tmp$mu2 + tmp$se2, col=colors[2])
+    points(1:5, tmp$fit2, type="l", col=colors[2])
+    text (3, .9, state.names[i], cex=1.3)
+  }
+}
+mtext ("2008 election:  McCain share of the two-party vote in each income category\nwithin each state among all voters (gray) and just non-Hispanic whites (orange)", outer=TRUE, cex=1, side=3, line=1)
+mtext (" Dots are weighted averages from pooled June-Nov Pew surveys; error bars show +/- 1 s.e. bounds.\n Curves are estimated using multilevel models and have a s.e. of about 3% at each point.\n States are ordered in decreasing order of McCain vote (Alaska, Hawaii, and D.C. excluded).", outer=TRUE, cex=.9, side=1, line=5)
+dev.off()
+
+#2004
+stt.inc <- as.data.frame(expand.grid(sort(unique(D2$stt)), sort(unique(D2$inc))))
+colnames(stt.inc) <- c("stt", "inc")
+stt.inc$fit2 <- stt.inc$se2 <- stt.inc$mu2 <- 
+  stt.inc$fit1 <- stt.inc$se1 <- stt.inc$mu1 <- NA
+
+for (i in 1:nrow(stt.inc)) {
+  ok <- which(dat.vot$stt==stt.inc$stt[i] & dat.vot$inc==stt.inc$inc[i] & dat.vot$year==2004)
+  if (length(ok) > 1) {
+    stt.inc$fit1[i] <- D2$vote2004[D2$stt==stt.inc$stt[i] & D2$inc==stt.inc$inc[i]]
+    stt.inc$mu1[i] <- min(0.98, max(0.02, weighted_mean(dat.vot$rvote[ok], w=dat.vot$weight[ok])))
+    stt.inc$se1[i] <- sqrt((stt.inc$fit1[i]*(1-stt.inc$fit1[i])) / length(ok))
+  }
+  ok <- which(dat.vot$stt==stt.inc$stt[i] & dat.vot$inc==stt.inc$inc[i] & dat.vot$year==2004 & dat.vot$eth==1)
+  if (length(ok) > 1) {
+    stt.inc$fit2[i] <- D3$vote2004[D3$stt==stt.inc$stt[i] & D3$inc==stt.inc$inc[i]]
+    stt.inc$mu2[i] <- min(0.98, max(0.02, weighted_mean(dat.vot$rvote[ok], w=dat.vot$weight[ok])))
+    stt.inc$se2[i] <- sqrt((stt.inc$fit2[i]*(1-stt.inc$fit2[i])) / length(ok))
+  }
+}
+
+png ("stan_fig2.png", height=10, width=10, res=300, units="in")
+graph.dims <- c(7,7)
+par(mfrow=graph.dims, mar=c(1,0.75,1,0.75), tck=0, mgp=c(1.5,.5,0), 
+    oma=c(7,2,4,0), lwd=0.5)
+sort.state <- rev(order(dat.stt$rep2008[1:51]))
+state.names <- c(state.name[1:8], "Washington DC", state.name[9:50])
+colors <- c ("gray40", "darkorange")
+pchs <- c (20, 21)
+count <- 0
+for (i in sort.state){
+  if (!(stt.label[i] %in% c("AK","HI","DC"))){
+    count <- count + 1
+    plot(c(1,5), c(0,1), xlab="", ylab="", xaxt="n", yaxt="n", type="n", yaxs="i")
+    if (count%%graph.dims[2]==1)
+      axis(2, c(.02,.5,.95), c("0%","50%","100%"), cex.axis=1.1, lwd=0.5)
+    if (count > (48-graph.dims[2]))
+      axis(1, c(1.2,3,4.8), c("poor","mid","rich"), cex.axis=1.2, lwd=0.5)
+    abline (.5, 0, col="gray", lwd=.5)
+    
+    tmp <- stt.inc[stt.inc$stt==i,]
+    points(1:5 - 0.05, tmp$mu1, pch=20, col=colors[1], cex=0.5)
+    segments(1:5 - 0.05, tmp$mu1 - tmp$se1, 1:5 - 0.05, tmp$mu1 + tmp$se1, col=colors[1])
+    points(1:5, tmp$fit1, type="l", col=colors[1])
+    
+    points(1:5 + 0.05, tmp$mu2, ylim=c(0,1), pch=20, col=colors[2], cex=0.5)
+    segments(1:5 + 0.05, tmp$mu2 - tmp$se2, 1:5 + 0.05, tmp$mu2 + tmp$se2, col=colors[2])
+    points(1:5, tmp$fit2, type="l", col=colors[2])
+    text (3, .9, state.names[i], cex=1.3)
+  }
+}
+mtext ("2004 election:  Bush share of the two-party vote in each income category\nwithin each state among all voters (gray) and just non-Hispanic whites (orange)", outer=TRUE, cex=1, side=3, line=1)
+mtext (" Dots are weighted averages from pooled June-Nov Annenberg surveys; error bars show +/- 1 s.e. bounds.\n Curves are estimated using multilevel models and have a s.e. of about 3% at each point.\n States are ordered in decreasing order of the 2008 Mcain vote (Alaska, Hawaii, and D.C. excluded).", outer=TRUE, cex=.9, side=1, line=5)
+dev.off()
