@@ -18,7 +18,7 @@ source("mrp_replication_script2.R")
 
 #Create the box plots
 setwd(base_dir)
-setwd("Boxplot Comparison/R code/Term\ Comparison/")
+setwd("Boxplot Comparison R Code/Term Comparison/")
 source("script_to_plot_fixed_and_rand_effects.R")
 
 #Run the NAES data process
