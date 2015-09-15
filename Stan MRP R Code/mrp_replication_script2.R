@@ -143,7 +143,7 @@ data_matrix$vote2008.M <- invlogit(summary(M.vot[[2]])$summary[interested_rows, 
 
 ### poststratification
 dat.pop$grp <- apply(dat.pop[, c("stt", "eth", "inc", "age")], 1, paste, collapse="_")
-data_pop_info <- summarize(data = group_by(dat.pop, grp),
+data_pop_info <- summarize(group_by(dat.pop, grp),
                            pop2004=sum(wtd2004), 
                            pop2008=sum(wtd2008))
 data_pop_info$grp <- rownames(data_pop_info)
