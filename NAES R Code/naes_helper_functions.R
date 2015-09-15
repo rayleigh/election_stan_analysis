@@ -1,4 +1,5 @@
 library(dplyr)
+library(mi)
 
 create_online_data_matrix_from_questions <- function(naes_online_data_matrix, naes_weights_data_matrix)
 {
@@ -68,11 +69,10 @@ create_phone_data_from_database <- function(naes_phone_data_matrix)
   
   naes_phone_missing_matrix <- missing_data.frame(tmp_phone_missing_data_matrix)
   naes_phone_missing_matrix <- change(naes_phone_missing_matrix, y = c("edu", "emp", "eth", "sex"), what = "type", to = c("ordered-categorical", "unordered-categorical", "unordered-categorical", "binary"))
-
-  #Run imputation 10 times, grab last chain of 10
-  naes_imputed_data <- lapply(1:10, function(i) {print(i); impute_and_grab_data(naes_phone_missing_matrix)})
-  naes_phone_interested_matrix_list <- lapply(naes_imputed_data, function(naes_imputed_data_matrix) {naes_phone_interested_matrix$inc <- naes_imputed_data_matrix$inc; return(naes_phone_interested_matrix)})
   
+  #Run imputation 10 times, grab last chain of 10
+  naes_phone_interested_matrix_list <- lapply(1:10, function(i) {print(i); impute_and_grab_inc_data(naes_phone_missing_matrix, naes_phone_interested_matrix)})
+
   return(naes_phone_interested_matrix_list)
 }
 
@@ -216,10 +216,12 @@ get_data_matrix_without_missing_vals_cols <- function(key_questions, data_matrix
   return(data_matrix[!remove_row, ])
 }
 
-impute_and_grab_data <- function(missing_matrix)
+impute_and_grab_inc_data <- function(missing_matrix, data_matrix)
 {
   missing_imputations <- mi(missing_matrix, n.iter = 60, n.chains = 10)
-  imputated_matrix <- complete(missing_imputations)
+  imputated_matrix <- complete(missing_imputations)[[10]]
+  data_matrix$inc <- imputated_matrix$inc
+  return(data_matrix)
 }
 
 summarize_inc_distr <- function(data_matrix)
