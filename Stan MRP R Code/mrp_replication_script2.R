@@ -117,8 +117,8 @@ for (i.year in 1:2) {
   tmp$grp <- apply(tmp[, c("stt", "eth", "inc", "age")], 1, paste, collapse="_")
   tmp$ones <- 1
   
-  stan_cps_data <- stan_vote_regression(data_matrix, tmp, 3, paste("CPS_Turnout_Model",years[i.year],sep="_"))
-  M.cps[[i.year]] <- stan(data = stan_cps_data, file = "../Stan/CPS_Turnout_Model_2004_Level_3.stan", iter = 500) 
+  stan_cps <- stan_vote_regression(data_matrix, tmp, 3, paste("CPS_Turnout_Model",years[i.year],sep="_"))
+  M.cps[[i.year]] <- stan(data = stan_cps$data, file = "../Stan/CPS_Turnout_Model_2004_Level_3.stan", iter = 500) 
 
   ### vote choice model
   cat("*****   Annenberg/Pew Vote Choice Model\n")
@@ -127,8 +127,8 @@ for (i.year in 1:2) {
   tmp$ones <- 1
   tmp <- rename(tmp,vote = rvote)
   
-  stan_pew_data <- stan_vote_regression(data_matrix, tmp, 3, paste("Pew_Vote_Model",years[i.year],sep="_"))
-  M.vot[[i.year]] <- stan(data = stan_pew_data, file = file = "../Stan/CPS_Turnout_Model_2004_Level_3.stan", iter = 500)
+  stan_pew <- stan_vote_regression(data_matrix, tmp, 3, paste("Pew_Vote_Model",years[i.year],sep="_"))
+  M.vot[[i.year]] <- stan(data = stan_pew$data, file = file = "../Stan/CPS_Turnout_Model_2004_Level_3.stan", iter = 500)
 
   
 }
