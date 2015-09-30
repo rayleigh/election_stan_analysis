@@ -99,6 +99,14 @@ data_matrix$stt <- factor(data_matrix$stt)
 data_matrix$grp <- apply(data_matrix, 1, paste, collapse="_")
 data_matrix$ix <- 1:nrow(data_matrix)
 
+### covariates
+data_matrix <- mutate(data_matrix,
+                      reg = factor(reg.lkup[stt]),
+                      z_inc = rescale(inc),
+                      z_incstt = L.z.incstt[[1]][stt],
+                      z_trnprv = L.z.trnprv[[1]][stt],
+                      z_repprv = L.z.repprv[[1]][stt])
+
 ### poststratification setup
 interested_rows <- sapply(1:nrow(data_matrix), function(i) paste("p[", i, "]", sep = ""))
 interested_cols <- c("mean")
@@ -117,14 +125,6 @@ result_matrix <- result_matrix[order(result_matrix$ix),]
 M.cps <- M.vot <- list()
 for (i in 1:2) {
   cat(paste("***** Multilevel Models for Split", i, "\n"))
-  
-  ### covariates
-  data_matrix <- mutate(data_matrix,
-                        reg = factor(reg.lkup[stt]),
-                        z_inc = rescale(inc),
-                        z_incstt = L.z.incstt[[1]][stt],
-                        z_trnprv = L.z.trnprv[[1]][stt],
-                        z_repprv = L.z.repprv[[1]][stt])
   
   ### vote choice model
   cat("*****   Annenberg/Pew Vote Choice Model\n")
@@ -150,5 +150,5 @@ for (i in 1:2) {
   
   save.image("Split_analysis2.Rdata")
   
-  generate_fig_2_for_2004(result_matrix, dat.stt, dat.vot, paste("stan_split", i, "fig_2.png", sep = "_"))  
+  generate_fig_2_for_2004(result_matrix, dat.stt, dat.vot.split_list[[i]], paste("stan_split", i, "fig_2.png", sep = "_"))  
 }

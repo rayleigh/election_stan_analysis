@@ -18,7 +18,9 @@ generate_fig_2_for_2008 <- function(data_matrix, dat.stt, dat.vot)
   
   stt.inc <- as.data.frame(expand.grid(sort(unique(D2$stt)), sort(unique(D2$inc))))
   colnames(stt.inc) <- c("stt", "inc")
-
+  stt.inc$fit2 <- stt.inc$se2 <- stt.inc$mu2 <- 
+    stt.inc$fit1 <- stt.inc$se1 <- stt.inc$mu1 <- NA
+  
   for (i in 1:nrow(stt.inc)) {
     ok <- which(dat.vot$stt==stt.inc$stt[i] & dat.vot$inc==stt.inc$inc[i] & dat.vot$year==2008)
     if (length(ok) > 1) {
@@ -56,6 +58,8 @@ generate_fig_2_for_2004 <- function(data_matrix, dat.stt, dat.vot, plot_title_fi
   
   stt.inc <- as.data.frame(expand.grid(sort(unique(D2$stt)), sort(unique(D2$inc))))
   colnames(stt.inc) <- c("stt", "inc")
+  stt.inc$fit2 <- stt.inc$se2 <- stt.inc$mu2 <- 
+    stt.inc$fit1 <- stt.inc$se1 <- stt.inc$mu1 <- NA 
   
   for (i in 1:nrow(stt.inc)) {
     ok <- which(dat.vot$stt==stt.inc$stt[i] & dat.vot$inc==stt.inc$inc[i] & dat.vot$year==2004)
