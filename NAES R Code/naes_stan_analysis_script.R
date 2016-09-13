@@ -6,9 +6,10 @@ setwd(processed_file_dir)
 load("naes_data_processed.Rdata")
 
 library(arm)
-library(car)
 library(maps)
 library(rstan)
+library(rstanarm)
+library(dplyr)
 
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
@@ -36,8 +37,11 @@ L.z.repprv <- dat.stt$z.rep2004
 L.z.trnprv <- dat.stt$z.trn2004
 
 #Build predictor matrix
+code_file_dir <- "~/Documents/Gelman Research/Replication/Subsequent Research/R code/"
+setwd(code_file_dir)
 source("stan_lmer_voting_analysis.R")
 
+setwd(processed_file_dir)
 predictor_matrix <- as.data.frame(expand.grid(1:51, 1:4, 1:5, 1:4))
 colnames(predictor_matrix) <- c("stt", "eth", "inc", "age")
 predictor_matrix$age <- factor(predictor_matrix$age)
@@ -54,9 +58,11 @@ predictor_matrix <- mutate(predictor_matrix,
                            z_trnprv = L.z.trnprv[stt],
                            z_repprv = L.z.repprv[stt])
 
-naes_stan_obj_list <- lapply(naes_data_matrix_list, function(naes_data_matrix) {stan_vote_regression(predictor_matrix, naes_data_matrix, 3, "output.csv")})
-
 model_name_template <- "Annenberg_analysis"
+naes_stan_analyzed_list <- lapply(1:length(naes_data_matrix_list), 
+                                  function(i) {cat(i); colMeans(plogis(posterior_linpred(stan_vote_regression(predictor_matrix, naes_data_matrix_list[[i]], 3, paste(model_name_template, i, "sample_output", sep = "_")))))})
+save(naes_stan_analyzed_list, file = paste(model_name_template, "prob.Rdata", sep = "_"))
 
-naes_stan_analyzed_list <- lapply(1:length(naes_stan_obj_list), function(i) {stan(file = "../Stan/CPS_Turnout_Model_2004_Level_3.stan", data = naes_stan_obj_list[[i]]$data, model_name = paste(model_name_template, i, sep = "_"), sample_file = paste(model_name_template, i, "sample_output", sep = "_"), iter = 500)})
+#naes_stan_obj_list <- lapply(naes_data_matrix_list, function(naes_data_matrix) {stan_vote_regression(predictor_matrix, naes_data_matrix, 3, "output.csv")})
+#naes_stan_analyzed_list <- lapply(1:length(naes_stan_obj_list), function(i) {stan(file = "../Stan/CPS_Turnout_Model_2004_Level_3.stan", data = naes_stan_obj_list[[i]]$data, model_name = paste(model_name_template, i, sep = "_"), sample_file = paste(model_name_template, i, "sample_output", sep = "_"), iter = 500)})
 #save.image(file = "naes_data_analy")

@@ -7,7 +7,8 @@ create_online_data_matrix_from_questions <- function(naes_online_data_matrix, na
   
   #Create lists to help parse the data
   #Age, Income, Race/ethnicity, State of residency, Would vote today for Obama/McCain, Would vote for Republican
-  online_interested_questions <- c("WA02", "WA05", "WC01", "WFc01", "RCa02", "RCa01", "RKEY")
+  #online_interested_questions <- c("WA02", "WA05", "WC01", "WFc01", "RCa02", "RCa01", "RKEY")
+  online_interested_questions <- c("WA02", "WA05", "WC01", "WFc01", "RCa02", "RCa01", "WA01", "WA03", "WFa08", "WD01", "WD02", "WD03", "RKEY")
   naes_online_eth <- 1:5
   online_naes_eth_translate <- c(1, 2, 4, 3, 4)
   naes_online_inc <- 1:19
@@ -21,7 +22,13 @@ create_online_data_matrix_from_questions <- function(naes_online_data_matrix, na
   online_interested_data_matrix$"eth" <- plyr::mapvalues(online_interested_data_matrix$WC01_a, naes_online_eth, online_naes_eth_translate)
   online_interested_data_matrix$"inc" <- plyr::mapvalues(online_interested_data_matrix$WA05_a, naes_online_inc, online_naes_inc_translate)
   online_interested_data_matrix$"stt" <- translate_state(online_interested_data_matrix$WFc01_a)
-
+  online_interested_data_matrix <- rename(online_interested_data_matrix, sex = WA01_a, edu = WA03_a, marital_status = WFa08_a, rel_attend = WD03_b)
+  online_interested_data_matrix$"rel_attend"[online_interested_data_matrix$"rel_attend" == 6] <- 5
+  online_interested_data_matrix$"rel_attend"[online_interested_data_matrix$"rel_attend" == 999] <- -1
+  online_interested_data_matrix$"religion" <- sapply(1:nrow(online_interested_data_matrix), function(i) {
+                                                     translate_online_religion(online_interested_data_matrix$"WD02_b"[i], 
+                                                                               online_interested_data_matrix$"WD01_b"[i])}, simplify = T)
+    
   online_interested_data_matrix <- get_data_matrix_with_only_col_pref_known(online_voting_pref_questions, c(1:2), "vote", online_interested_data_matrix)
   online_interested_data_matrix$"vote"[online_interested_data_matrix$"vote" == 2] = 0
 
@@ -121,6 +128,45 @@ translate_state_to_reg <- function(survey_state_col)
   reg_translate <- c(3,4,4,3,4,4,1,1,5,3,3,4,4,2,2,2,2,3,3,1,1,1,2,2,3,2,4,2,4,1,1,4,1,3,2,2,3,4,1,1,3,2,3,3,4,1,3,4,1,2,4)
   
   return(plyr::mapvalues(survey_state_col, survey_stt, reg_translate))
+}
+
+translate_online_religion <- function(evangelical_answer, religion_answer)
+{
+  if (is.na(evangelical_answer) | is.na(religion_answer))
+  {
+    return(-1)
+  }
+  #Is Catholic
+  else if (religion_answer == 3)
+  {
+    return(1)
+  }
+  #Is Protestant
+  else if (religion_answer == 2)
+  {
+    #Evangelical Protestant
+    if (evangelical_answer == 1)
+    {
+      return(2)
+    }
+    #Non-evangelical Protestant
+    else if (evangelical_answer == 2)
+    {
+      return(3)
+    }
+    else
+    {
+      return(-1)
+    }
+  }
+  else if (religion_answer != 999)
+  {
+    return(4)
+  }
+  else
+  {
+    return(-1)
+  }
 }
 
 translate_phone_eth <- function(hispanic_origin_answer, race_answer)
